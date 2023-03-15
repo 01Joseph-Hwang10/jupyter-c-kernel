@@ -15,7 +15,7 @@
 #if __STDC_VERSION__ <= 199409L
 #define C89_SUPPORT
 #endif /* __STDC_VERSION__ <= 199409L */
-#else /* __STDC_VERSION__ */
+#else  /* __STDC_VERSION__ */
 #define C89_SUPPORT
 #endif /* __STDC_VERSION__ */
 
@@ -23,20 +23,24 @@
 #ifdef BUFFERED_OUTPUT
 /* buffer for all output */
 /* TODO allocate this dynamically */
-static char outputBuff[1<<10] = "";
+static char outputBuff[1 << 10] = "";
 static char attachedOutputFlush = 0;
 
-void flush_all_output() {
+void flush_all_output()
+{
   printf("%s", outputBuff);
   fflush(stdout);
   outputBuff[0] = '\0';
 }
 
 /* Flush all output on exit */
-void attachOutputFlush() {
-  if(attachedOutputFlush == 0){
+void attachOutputFlush()
+{
+  if (attachedOutputFlush == 0)
+  {
     int error = atexit(flush_all_output);
-    if(error != 0) {
+    if (error != 0)
+    {
       fprintf(stderr, "ERROR: Could not set exit function! Error %d\n", error);
     }
     attachedOutputFlush = 1;
@@ -45,14 +49,17 @@ void attachOutputFlush() {
 
 /* this function is called to check whether there
   is a '\n' in the output that should be flushed */
-void flush_until_newline() {
+void flush_until_newline()
+{
   long i = 0;
   long length = strlen(outputBuff);
-  for(; i < length; ++i) {
-    if(outputBuff[i] == '\n') {
-      char *printBuff = malloc(i+2);
-      strncpy(printBuff, outputBuff, i+1);
-      printBuff[i+1] = '\0';
+  for (; i < length; ++i)
+  {
+    if (outputBuff[i] == '\n')
+    {
+      char *printBuff = malloc(i + 2);
+      strncpy(printBuff, outputBuff, i + 1);
+      printBuff[i + 1] = '\0';
       printf("%s", printBuff);
       free(printBuff);
       /* now remove the printed string from the buffer
@@ -61,7 +68,8 @@ void flush_until_newline() {
         long a = 0;
         ++i;
         /* +1 to include \0 */
-        for(; i < length + 1; ++a, ++i) {
+        for (; i < length + 1; ++a, ++i)
+        {
           outputBuff[a] = outputBuff[i];
         }
         i = 0;
@@ -75,13 +83,14 @@ void flush_until_newline() {
   Then cycle through all chars and see if \n is
   written. If there is one, flush the output, otherwise
   write to buffer */
-int printf_wrap(const char *format, ...) {
+int printf_wrap(const char *format, ...)
+{
   /* append output to buffer */
   va_list arglist;
   int result;
-  va_start( arglist, format );
+  va_start(arglist, format);
   result = vsprintf(outputBuff + strlen(outputBuff), format, arglist);
-  va_end( arglist );
+  va_end(arglist);
 
   /* Now flush if there is a reason to */
   flush_until_newline();
@@ -91,11 +100,13 @@ int printf_wrap(const char *format, ...) {
   return result;
 }
 
-int putchar_wrap(int c) {
+int putchar_wrap(int c)
+{
   long length = strlen(outputBuff);
   outputBuff[length] = (char)c;
-  outputBuff[length+1] = '\0';
-  if(c == '\n') {
+  outputBuff[length + 1] = '\0';
+  if (c == '\n')
+  {
     flush_until_newline();
   }
 
@@ -104,15 +115,19 @@ int putchar_wrap(int c) {
   return c;
 }
 
-int fflush_wrap(FILE* stream) {
-  if(stream == stdout) {
+int fflush_wrap(FILE *stream)
+{
+  if (stream == stdout)
+  {
     flush_all_output();
   }
   return fflush(stream);
 }
 
-int fclose_wrap(FILE* stream) {
-  if(stream == stdout) {
+int fclose_wrap(FILE *stream)
+{
+  if (stream == stdout)
+  {
     flush_all_output();
   }
   return fclose(stream);
@@ -121,14 +136,16 @@ int fclose_wrap(FILE* stream) {
 
 /* Need input buffer to know whether we need another input request */
 /* TODO allocate this dynamically */
-static char inputBuff[1<<10] = "";
+static char inputBuff[1 << 10] = "";
 static long scanf_wrap_number_read = 0;
 
 /* read remaining input into buffer so it can be used in next call */
-void readIntoBuffer() {
+void readIntoBuffer()
+{
   long length = strlen(inputBuff);
   char nextChar = 0;
-  while((nextChar = getchar()) != '\n' && nextChar != EOF){
+  while ((nextChar = getchar()) != '\n' && nextChar != EOF)
+  {
     inputBuff[length++] = nextChar;
   }
   inputBuff[length++] = '\n';
@@ -136,10 +153,12 @@ void readIntoBuffer() {
 }
 
 /* check whether input request is needed */
-char checkInputRequest() {
+char checkInputRequest()
+{
   const long length = strlen(inputBuff);
   long i = 0;
-  for(; i < length && isspace(inputBuff[i]); ++i);
+  for (; i < length && isspace(inputBuff[i]); ++i)
+    ;
   return i == length;
 }
 
@@ -155,45 +174,50 @@ char checkInputRequest() {
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
-   extern int vsscanf (const char *__restrict __s,
-                       const char *__restrict __format, _G_va_list __arg)
-        __THROW __attribute__ ((__format__ (__scanf__, 2, 0)));
+extern int vsscanf(const char *__restrict __s,
+                   const char *__restrict __format, _G_va_list __arg)
+    __THROW __attribute__((__format__(__scanf__, 2, 0)));
 
-  /* replace all % with %* to suppress read in and do test run */
-  long find_scanf_length(const char *format) {
-    const long length = strlen(format);
-    /* allow for maximum of 50 format specifiers */
-    char *formatString = malloc(length + 53);
-    long index = 0;
-    long formatIndex = 0;
-    for(; index < length; ++index, ++formatIndex) {
-      formatString[formatIndex] = format[index];
-      if(format[index] == '%' &&
-        (index + 1 < length && format[index + 1] != '%')) {
-        formatString[++formatIndex] = '*';
-      }
-    }
-    /* add number readin */
-    formatString[formatIndex++] = '%';
-    formatString[formatIndex++] = 'n';
-    formatString[formatIndex] = '\0';
-
-    /* now run and record how many characters were read */
+/* replace all % with %* to suppress read in and do test run */
+long find_scanf_length(const char *format)
+{
+  const long length = strlen(format);
+  /* allow for maximum of 50 format specifiers */
+  char *formatString = malloc(length + 53);
+  long index = 0;
+  long formatIndex = 0;
+  for (; index < length; ++index, ++formatIndex)
+  {
+    formatString[formatIndex] = format[index];
+    if (format[index] == '%' &&
+        (index + 1 < length && format[index + 1] != '%'))
     {
-      int readLength = 0;
-      sscanf(inputBuff, formatString, &readLength);
-      free(formatString);
-
-      return readLength;
+      formatString[++formatIndex] = '*';
     }
   }
+  /* add number readin */
+  formatString[formatIndex++] = '%';
+  formatString[formatIndex++] = 'n';
+  formatString[formatIndex] = '\0';
+
+  /* now run and record how many characters were read */
+  {
+    int readLength = 0;
+    sscanf(inputBuff, formatString, &readLength);
+    free(formatString);
+
+    return readLength;
+  }
+}
 #endif /* C89_SUPPORT */
 
-int scanf_wrap(const char *format, ...) {
+int scanf_wrap(const char *format, ...)
+{
   char doRequest = checkInputRequest();
   char *formatString = 0;
 
-  if(doRequest) {
+  if (doRequest)
+  {
 #ifdef BUFFERED_OUTPUT
     flush_all_output();
 #endif
@@ -212,7 +236,7 @@ int scanf_wrap(const char *format, ...) {
     formatString[length] = '%';
     formatString[length + 1] = 'n';
     formatString[length + 2] = '\0';
-#else /* C89_SUPPORT */
+#else  /* C89_SUPPORT */
     formatString[length] = '\0';
     /* In C89 we need to find how far scanf will read, by hand */
     scanf_wrap_number_read = find_scanf_length(format);
@@ -232,7 +256,8 @@ int scanf_wrap(const char *format, ...) {
       long index = scanf_wrap_number_read;
       long a = 0;
       /* +1 to include \0 */
-      for(; index < length + 1; ++a, ++index) {
+      for (; index < length + 1; ++a, ++index)
+      {
         inputBuff[a] = inputBuff[index];
       }
     }
@@ -242,11 +267,13 @@ int scanf_wrap(const char *format, ...) {
   }
 }
 
-int getchar_wrap(){
+int getchar_wrap()
+{
   /* check if there is still something in the input buffer*/
   char input = 0;
   long length = strlen(inputBuff);
-  if(length <= 0) {
+  if (length <= 0)
+  {
 #ifdef BUFFERED_OUTPUT
     flush_all_output();
 #endif
@@ -261,9 +288,11 @@ int getchar_wrap(){
     long i = 1;
     long length = strlen(inputBuff) + 1;
     /* shift all chars one to the left */
-    for(; i < length; ++i){
-      inputBuff[i-1] = inputBuff[i];
-      if(inputBuff[i] == '\0') {
+    for (; i < length; ++i)
+    {
+      inputBuff[i - 1] = inputBuff[i];
+      if (inputBuff[i] == '\0')
+      {
         break;
       }
     }
@@ -298,24 +327,26 @@ int getchar_wrap(){
 
 /* Define wrapping functions */
 /* Output that the fopen succeeded and return some valid pointer */
-FILE *fopen_wrap(const char *filename, const char *modes) {
+FILE *fopen_wrap(const char *filename, const char *modes)
+{
   static long stream = 0x1FFFF0000;
 #ifdef SHOW_FILE_IO_VERBOSE
   printf("\x01b[42m");
   printf("\"%s\" opened in mode \"%s\"\n", filename, modes);
   printf("\x01b[0m");
 #endif /* SHOW_FILE_IO_VERBOSE */
-  return (FILE*)stream++;
+  return (FILE *)stream++;
 }
 
-int fprintf_wrap(FILE* stream, const char* format, ...) {
+int fprintf_wrap(FILE *stream, const char *format, ...)
+{
   printf("\x01b[42m");
   printf("%p:", stream);
   printf("\x01b[0m");
   va_list arglist;
-  va_start( arglist, format );
+  va_start(arglist, format);
   int result = vprintf(format, arglist);
-  va_end( arglist );
+  va_end(arglist);
   return result;
 }
 
@@ -324,6 +355,6 @@ int fprintf_wrap(FILE* stream, const char* format, ...) {
 
 #define fprintf(stream, format, ...) fprintf_wrap(stream, format, ##__VA_ARGS__)
 
-#endif  /* READ_ONLY_FILE_SYSTEM */
+#endif /* READ_ONLY_FILE_SYSTEM */
 
 #endif /* STDIO_WRAP_H */

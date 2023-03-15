@@ -8,6 +8,19 @@ import tempfile
 import os
 import os.path as path
 
+logpath = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        '..',
+        'logs',
+        'kernel.log',
+    ))
+
+
+def _log(content):
+    with open(logpath, 'a') as f:
+        f.write(content)
+
 
 class RealTimeSubprocess(subprocess.Popen):
     """
@@ -16,7 +29,13 @@ class RealTimeSubprocess(subprocess.Popen):
 
     inputRequest = "<inputRequest>"
 
-    def __init__(self, cmd, write_to_stdout, write_to_stderr, read_from_stdin):
+    def __init__(
+        self,
+        cmd,
+        write_to_stdout,
+        write_to_stderr,
+        read_from_stdin,
+    ):
         """
         :param cmd: the command to execute
         :param write_to_stdout: a callable that will be called with chunks of data from stdout
@@ -26,15 +45,33 @@ class RealTimeSubprocess(subprocess.Popen):
         self._write_to_stderr = write_to_stderr
         self._read_from_stdin = read_from_stdin
 
-        super().__init__(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, bufsize=0)
+        super().__init__(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            bufsize=0,
+        )
 
         self._stdout_queue = Queue()
-        self._stdout_thread = Thread(target=RealTimeSubprocess._enqueue_output, args=(self.stdout, self._stdout_queue))
+        self._stdout_thread = Thread(
+            target=RealTimeSubprocess._enqueue_output,
+            args=(
+                self.stdout,
+                self._stdout_queue,
+            ),
+        )
         self._stdout_thread.daemon = True
         self._stdout_thread.start()
 
         self._stderr_queue = Queue()
-        self._stderr_thread = Thread(target=RealTimeSubprocess._enqueue_output, args=(self.stderr, self._stderr_queue))
+        self._stderr_thread = Thread(
+            target=RealTimeSubprocess._enqueue_output,
+            args=(
+                self.stderr,
+                self._stderr_queue,
+            ),
+        )
         self._stderr_thread.daemon = True
         self._stderr_thread.start()
 
@@ -71,12 +108,12 @@ class RealTimeSubprocess(subprocess.Popen):
             # if there is input request, make output and then
             # ask frontend for input
             start = contents.find(self.__class__.inputRequest)
-            if(start >= 0):
+            if (start >= 0):
                 contents = contents.replace(self.__class__.inputRequest, '')
-                if(len(contents) > 0):
+                if (len(contents) > 0):
                     self._write_to_stdout(contents)
                 readLine = ""
-                while(len(readLine) == 0):
+                while (len(readLine) == 0):
                     readLine = self._read_from_stdin()
                 # need to add newline since it is not captured by frontend
                 readLine += "\n"
@@ -90,9 +127,11 @@ class CKernel(Kernel):
     implementation_version = '1.0'
     language = 'c'
     language_version = 'C11'
-    language_info = {'name': 'text/x-csrc',
-                     'mimetype': 'text/x-csrc',
-                     'file_extension': '.c'}
+    language_info = {
+        'name': 'text/x-csrc',
+        'mimetype': 'text/x-csrc',
+        'file_extension': '.c',
+    }
     banner = "C kernel.\n" \
              "Uses gcc, compiles in C11, and creates source code files and executables in temporary folder.\n"
 
@@ -107,24 +146,35 @@ class CKernel(Kernel):
         self._allow_stdin = True
         self.readOnlyFileSystem = False
         self.bufferedOutput = True
-        self.linkMaths = True # always link math library
-        self.wAll = True # show all warnings by default
-        self.wError = False # but keep comipiling for warnings
-        self.standard = "c11" # default standard if none is specified
+        self.linkMaths = True  # always link math library
+        self.wAll = True  # show all warnings by default
+        self.wError = False  # but keep comipiling for warnings
+        self.standard = "c11"  # default standard if none is specified
         self.files = []
         mastertemp = tempfile.mkstemp(suffix='.out')
         os.close(mastertemp[0])
         self.master_path = mastertemp[1]
-        self.resDir = path.join(path.dirname(path.realpath(__file__)), 'resources')
+        self.resDir = path.join(
+            path.dirname(path.realpath(__file__)),
+            'resources',
+        )
         filepath = path.join(self.resDir, 'master.c')
-        subprocess.call(['gcc', filepath, '-std=c11', '-rdynamic', '-ldl', '-o', self.master_path])
+        subprocess.call([
+            'gcc',
+            filepath,
+            '-std=c11',
+            '-rdynamic',
+            '-ldl',
+            '-o',
+            self.master_path,
+        ])
 
     def cleanup_files(self):
         """Remove all the temporary files created by the kernel"""
         # keep the list of files create in case there is an exception
         # before they can be deleted as usual
         for file in self.files:
-            if(os.path.exists(file)):
+            if (os.path.exists(file)):
                 os.remove(file)
         os.remove(self.master_path)
 
@@ -138,21 +188,44 @@ class CKernel(Kernel):
         return file
 
     def _write_to_stdout(self, contents):
-        self.send_response(self.iopub_socket, 'stream', {'name': 'stdout', 'text': contents})
+        self.send_response(
+            self.iopub_socket,
+            'stream',
+            {
+                'name': 'stdout',
+                'text': contents,
+            },
+        )
 
     def _write_to_stderr(self, contents):
-        self.send_response(self.iopub_socket, 'stream', {'name': 'stderr', 'text': contents})
+        self.send_response(
+            self.iopub_socket,
+            'stream',
+            {
+                'name': 'stderr',
+                'text': contents,
+            },
+        )
 
     def _read_from_stdin(self):
         return self.raw_input()
 
     def create_jupyter_subprocess(self, cmd):
-        return RealTimeSubprocess(cmd,
-                                  self._write_to_stdout,
-                                  self._write_to_stderr,
-                                  self._read_from_stdin)
+        return RealTimeSubprocess(
+            cmd,
+            self._write_to_stdout,
+            self._write_to_stderr,
+            self._read_from_stdin,
+        )
 
-    def compile_with_gcc(self, source_filename, binary_filename, cflags=None, ldflags=None):
+    def compile_with_gcc(
+        self,
+        source_filename,
+        deps_filenames,
+        binary_filename,
+        cflags=None,
+        ldflags=None,
+    ):
         cflags = ['-pedantic', '-fPIC', '-shared', '-rdynamic'] + cflags
         if self.linkMaths:
             cflags = cflags + ['-lm']
@@ -164,22 +237,27 @@ class CKernel(Kernel):
             cflags = ['-DREAD_ONLY_FILE_SYSTEM'] + cflags
         if self.bufferedOutput:
             cflags = ['-DBUFFERED_OUTPUT'] + cflags
-        args = ['gcc', source_filename] + cflags + ['-o', binary_filename] + ldflags
+        args = ['gcc', source_filename
+                ] + deps_filenames + cflags + ['-o', binary_filename] + ldflags
         return self.create_jupyter_subprocess(args)
 
     def _filter_magics(self, code):
 
-        magics = {'cflags': [],
-                  'ldflags': [],
-                  'args': []}
+        magics = {
+            'cflags': [],
+            'ldflags': [],
+            'args': [],
+        }
 
         actualCode = ''
 
         for line in code.splitlines():
             if line.startswith('//%'):
                 magicSplit = line[3:].split(":", 2)
-                if(len(magicSplit) < 2):
-                    self._write_to_stderr("[C kernel] Magic line starting with '//%' is missing a semicolon, ignoring.")
+                if (len(magicSplit) < 2):
+                    self._write_to_stderr(
+                        "[C kernel] Magic line starting with '//%' is missing a semicolon, ignoring."
+                    )
                     continue
 
                 key, value = magicSplit
@@ -190,7 +268,8 @@ class CKernel(Kernel):
                         magics[key] += [flag]
                 elif key == "args":
                     # Split arguments respecting quotes
-                    for argument in re.findall(r'(?:[^\s,"]|"(?:\\.|[^"])*")+', value):
+                    for argument in re.findall(r'(?:[^\s,"]|"(?:\\.|[^"])*")+',
+                                               value):
                         magics['args'] += [argument.strip('"')]
 
                 # always add empty line, so line numbers don't change
@@ -211,7 +290,7 @@ class CKernel(Kernel):
     def _add_main(self, magics, code):
         # remove comments
         tmpCode = re.sub(r"//.*", "", code)
-        tmpCode = re.sub(r"/\*.*?\*/", "", tmpCode, flags=re.M|re.S)
+        tmpCode = re.sub(r"/\*.*?\*/", "", tmpCode, flags=re.M | re.S)
 
         x = re.search(r"int\s+main\s*\(", tmpCode)
 
@@ -221,39 +300,99 @@ class CKernel(Kernel):
 
         return magics, code
 
-    def do_execute(self, code, silent, store_history=True,
-                   user_expressions=None, allow_stdin=True):
+    def _replace_include_directives(self, code):
+        # replace stdio with wrapped version
+        headerDir = "\"" + self.resDir + "/stdio_wrap.h" + "\""
+        code = code.replace("<stdio.h>", headerDir)
+
+        # Replace non-system-path includes with absolute path
+        parent = self.get_parent()
+        import json
+        _log("Parent: " + str(json.dumps(parent, default=lambda o: str(o))) +
+             "\n")
+        metadata = parent['metadata']
+        cell_id = str(metadata['cellId'])
+        """
+        Cell id looks like: vscode-notebook-cell:/Users/hwanghyeongyu/util/jupyter-c-kernel/example/example-notebook.ipynb#W1sZmlsZQ%3D%3D
+        Where /Users/hwanghyeongyu/util/jupyter-c-kernel/example is a workspace folder.
+        """
+        _log("Cell id: " + cell_id + "\n")
+        _, cell_path = cell_id.split(':', 1)
+        workspace_path, _ = cell_path.split('#', 1)
+
+        # Find codelines with include directives sourcing from non-system paths
+        # and replace them with absolute paths
+        deps = []
+        codelines = code.splitlines()
+        for i, codeline in enumerate(codelines):
+            if codeline.startswith('#include "'):
+                _, include_path = codeline.replace('"', '').split(' ', 1)
+                include_path = os.path.abspath(
+                    os.path.join(
+                        os.path.dirname(workspace_path),
+                        include_path,
+                    ))
+                if "stdio_wrap.h" in include_path:
+                    print("Skipping stdio_wrap.h as it is preserved")
+                    continue
+                deps.append(include_path)
+                codelines[i] = '#include "' + include_path + '"'
+
+        deps = list(map(lambda x: x.replace('.h', '.c'), deps))
+
+        return '\n'.join(codelines), deps
+
+    def do_execute(
+        self,
+        code,
+        silent,
+        store_history=True,
+        user_expressions=None,
+        allow_stdin=True,
+    ):
 
         magics, code = self._filter_magics(code)
 
         magics, code = self._add_main(magics, code)
 
-        # replace stdio with wrapped version
-        headerDir = "\"" + self.resDir + "/stdio_wrap.h" + "\""
-        code = code.replace("<stdio.h>", headerDir)
-        code = code.replace("\"stdio.h\"", headerDir)
+        # Replace include directives with workspace contexts
+        code, deps = self._replace_include_directives(code)
+
+        # Add newline for the source code
+        code += '\n'
 
         with self.new_temp_file(suffix='.c') as source_file:
             source_file.write(code)
             source_file.flush()
             with self.new_temp_file(suffix='.out') as binary_file:
-                p = self.compile_with_gcc(source_file.name, binary_file.name, magics['cflags'], magics['ldflags'])
+                p = self.compile_with_gcc(
+                    source_filename=source_file.name,
+                    deps_filenames=deps,
+                    binary_filename=binary_file.name,
+                    cflags=magics['cflags'],
+                    ldflags=magics['ldflags'],
+                )
                 while p.poll() is None:
                     p.write_contents()
                 p.write_contents()
                 if p.returncode != 0:  # Compilation failed
                     self._write_to_stderr(
-                            "[C kernel] GCC exited with code {}, the executable will not be executed".format(
-                                    p.returncode))
+                        "[C kernel] GCC exited with code {}, the executable will not be executed"
+                        .format(p.returncode))
 
                     # delete source files before exit
                     os.remove(source_file.name)
                     os.remove(binary_file.name)
 
-                    return {'status': 'ok', 'execution_count': self.execution_count, 'payload': [],
-                            'user_expressions': {}}
+                    return {
+                        'status': 'ok',
+                        'execution_count': self.execution_count,
+                        'payload': [],
+                        'user_expressions': {}
+                    }
 
-        p = self.create_jupyter_subprocess([self.master_path, binary_file.name] + magics['args'])
+        p = self.create_jupyter_subprocess(
+            [self.master_path, binary_file.name] + magics['args'])
         while p.poll() is None:
             p.write_contents()
 
@@ -268,8 +407,15 @@ class CKernel(Kernel):
         os.remove(binary_file.name)
 
         if p.returncode != 0:
-            self._write_to_stderr("[C kernel] Executable exited with code {}".format(p.returncode))
-        return {'status': 'ok', 'execution_count': self.execution_count, 'payload': [], 'user_expressions': {}}
+            self._write_to_stderr(
+                "[C kernel] Executable exited with code {}".format(
+                    p.returncode))
+        return {
+            'status': 'ok',
+            'execution_count': self.execution_count,
+            'payload': [],
+            'user_expressions': {},
+        }
 
     def do_shutdown(self, restart):
         """Cleanup the created source code files and executables when shutting down the kernel"""
