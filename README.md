@@ -14,6 +14,32 @@ Example code is provided in the `examples` folder. Keep in mind that c file and 
 
 There were some minor refactoring in both c and python code.
 
+## Pre-requisites
+
+1. gcc
+2. Jupyter Notebook
+
+## Installation
+
+```bash
+git clone https://github.com/01Joseph-Hwang10/jupyter-c-kernel
+cd jupyter-c-kernel
+pip install -r requirements.txt # Recommend to use virtualenv
+cd jupyter_c_kernel
+sudo python install_c_kernel
+```
+
+Make sure to reload the jupyter notebook after installation if there are existing running notebooks.
+
+## Note
+
+- This kernel was tested on:
+  - M1 Macbook Air
+  - OS: macOS Ventura 13.1
+  - RAM: 16GB
+  - gcc is provided by Xcode
+- I did not tested the Dockerfile, so it might not work.
+
 # Origianl README
 
 Check out the original README for further details: <https://github.com/XaverKlemenschits/jupyter-c-kernel#readme>
