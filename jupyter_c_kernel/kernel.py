@@ -8,19 +8,6 @@ import tempfile
 import os
 import os.path as path
 
-logpath = os.path.abspath(
-    os.path.join(
-        os.path.dirname(__file__),
-        '..',
-        'logs',
-        'kernel.log',
-    ))
-
-
-def _log(content):
-    with open(logpath, 'a') as f:
-        f.write(content)
-
 
 class RealTimeSubprocess(subprocess.Popen):
     """
@@ -307,16 +294,12 @@ class CKernel(Kernel):
 
         # Replace non-system-path includes with absolute path
         parent = self.get_parent()
-        import json
-        _log("Parent: " + str(json.dumps(parent, default=lambda o: str(o))) +
-             "\n")
         metadata = parent['metadata']
         cell_id = str(metadata['cellId'])
         """
         Cell id looks like: vscode-notebook-cell:/Users/hwanghyeongyu/util/jupyter-c-kernel/example/example-notebook.ipynb#W1sZmlsZQ%3D%3D
         Where /Users/hwanghyeongyu/util/jupyter-c-kernel/example is a workspace folder.
         """
-        _log("Cell id: " + cell_id + "\n")
         _, cell_path = cell_id.split(':', 1)
         workspace_path, _ = cell_path.split('#', 1)
 
